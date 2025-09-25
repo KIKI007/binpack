@@ -66,7 +66,8 @@ def get_transformation(boxA, boxB):
 
 packer = Packer()
 #packer.add_bin(Bin('M4', 0.73, 0.55, 0.46, 100))
-packer.add_bin(Bin('min van', 1.8, 1.2, 1.2, 100))
+packer.add_bin(Bin('min van 1', 1.5, 1.2, 1.2, 1000))
+packer.add_bin(Bin('min van 2', 2.0, 1.2, 1.2, 1000))
 #packer.add_bin(Bin('5t van', 4.5, 1.8, 1.8, 100))
 
 ps.init()
@@ -79,11 +80,13 @@ ps.set_ground_plane_mode("none")
 # furniture_parts = load_furniture("bekvam", combined=[], y_height=0.5) * 9
 # furniture_parts = load_furniture("bekvam", combined=[], y_height=0.5) * 9
 
-furniture_parts = load_boxes(["M4"] * 5)
+furniture_parts = load_boxes(["M1"] * 5)
 furniture_parts += load_boxes(["M2"] * 10)
+furniture_parts += load_boxes(["M4"] * 15)
+#furniture_parts += load_furniture("sjalland", combined=[[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]], y_height=0.73)
 
 #furniture_parts = load_furniture("sjalland", combined=[[2, 5 ,9], [3, 8, 4], [0], [1], [6], [7], [10]], y_height=0.73)
-furniture_parts += load_furniture("lantliv", combined=[], y_height=0.68) * 2
+#furniture_parts += load_furniture("lantliv", combined=[], y_height=0.68) * 2
 #furniture_parts = load_furniture("lantliv", combined=[[3], [0, 1, 2, 4, 5, 6, 7]]) * 2
 
 
@@ -106,16 +109,19 @@ for id, obj in enumerate(furniture_parts):
     #size = np.sort(size)[::-1]
     packer.add_item(Item(f"{id}", size[0], size[1], size[2], 1))
 
-packer.pack(bigger_first = True)
+packer.pack(bigger_first = True, distribute_items = True)
 
-dimension = np.array([packer.bins[0].width, packer.bins[0].height, packer.bins[0].depth], dtype=np.float64)
-box = Box(extents=dimension)
-box = box.apply_translation(dimension / 2.0)
-container = ps.register_surface_mesh("truck", box.vertices, box.faces)
-container.set_transparency(0.3)
-
-for b in packer.bins:
+y_offset = 1.5
+for ib, b in enumerate(packer.bins):
     print(":::::::::::", b.string())
+
+    dimension = np.array([b.width, b.height, b.depth], dtype=np.float64)
+    box = Box(extents=dimension)
+    box = box.apply_translation(dimension / 2.0)
+    box = box.apply_translation([0, y_offset * ib, 0])
+    container = ps.register_surface_mesh(f"truck {ib}", box.vertices, box.faces)
+    container.set_transparency(0.3)
+
     for id, item in enumerate(b.items):
         dimension = np.array(item.get_dimension(), dtype=np.float64)
         position =  np.array(item.position, dtype=np.float64)
@@ -127,7 +133,9 @@ for b in packer.bins:
         T = get_transformation(furniture_part_bboxs[part_id], box)
         part = Trimesh(furniture_parts[part_id].vertices, furniture_parts[part_id].faces)
         part = part.apply_transform(T)
-        ps.register_surface_mesh(f"pack part {part_id}", part.vertices, part.faces)
-    print(f"{len(packer.bins[0].items)}/{len(packer.items)}")
+        part.apply_translation([0, y_offset * ib, 0])
+        ps.register_surface_mesh(f"pack part {ib}_{part_id}", part.vertices, part.faces)
+
+    print(f"{len(b.items)}/{len(furniture_part_bboxs)}")
 
 ps.show()
