@@ -76,21 +76,13 @@ ps.set_front_dir("neg_y_front")
 ps.set_ground_plane_mode("none")
 
 
-# furniture_parts = load_furniture("bekvam", combined=[[0, 1, 2, 3, 4, 5, 6, 7]], y_height=0.5) * 1
-# furniture_parts = load_furniture("bekvam", combined=[], y_height=0.5) * 9
-# furniture_parts = load_furniture("bekvam", combined=[], y_height=0.5) * 9
-
-furniture_parts = load_boxes(["M1"] * 5)
-furniture_parts += load_boxes(["M2"] * 10)
-furniture_parts += load_boxes(["M4"] * 15)
-#furniture_parts += load_furniture("sjalland", combined=[[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]], y_height=0.73)
-
-#furniture_parts = load_furniture("sjalland", combined=[[2, 5 ,9], [3, 8, 4], [0], [1], [6], [7], [10]], y_height=0.73)
-#furniture_parts += load_furniture("lantliv", combined=[], y_height=0.68) * 2
-#furniture_parts = load_furniture("lantliv", combined=[[3], [0, 1, 2, 4, 5, 6, 7]]) * 2
-
+boxes_names = ["M1"] * 10 + ["M2"] * 12 + ["M4"] * 15
+group_map = {"M1": 0, "M2":1, "M4":2}
+furniture_parts = load_boxes(boxes_names)
+save_folder = "output/two-stages/"
 
 furniture_part_bboxs = []
+furniture_part_groupID = []
 for id, obj in enumerate(furniture_parts):
 
     bbox = obj.bounding_box_oriented.copy()
@@ -105,6 +97,7 @@ for id, obj in enumerate(furniture_parts):
 
     size = bbox.extents.copy()
     furniture_part_bboxs.append(bbox.copy())
+    furniture_part_groupID.append(group_map[boxes_names[id]])
 
     #size = np.sort(size)[::-1]
     packer.add_item(Item(f"{id}", size[0], size[1], size[2], 1))
@@ -112,6 +105,7 @@ for id, obj in enumerate(furniture_parts):
 packer.pack(bigger_first = True, distribute_items = True)
 
 y_offset = 1.5
+saved_scenes = [trimesh.Scene() for _ in range(3)]
 for ib, b in enumerate(packer.bins):
     print(":::::::::::", b.string())
 
@@ -121,6 +115,7 @@ for ib, b in enumerate(packer.bins):
     box = box.apply_translation([0, y_offset * ib, 0])
     container = ps.register_surface_mesh(f"truck {ib}", box.vertices, box.faces)
     container.set_transparency(0.3)
+    box.export(f"{save_folder}/truck_{ib}.obj")
 
     for id, item in enumerate(b.items):
         dimension = np.array(item.get_dimension(), dtype=np.float64)
@@ -128,14 +123,19 @@ for ib, b in enumerate(packer.bins):
         box = Box(extents=dimension)
         part_id = int(item.name)
         box = box.apply_translation(position + dimension / 2.0)
+        group_id = furniture_part_groupID[part_id]
         #ps.register_surface_mesh(f"bin pack box {id}", box.vertices, box.faces)
 
         T = get_transformation(furniture_part_bboxs[part_id], box)
         part = Trimesh(furniture_parts[part_id].vertices, furniture_parts[part_id].faces)
         part = part.apply_transform(T)
         part.apply_translation([0, y_offset * ib, 0])
+        saved_scenes[group_id].add_geometry(part)
         ps.register_surface_mesh(f"pack part {ib}_{part_id}", part.vertices, part.faces)
 
     print(f"{len(b.items)}/{len(furniture_part_bboxs)}")
+
+for id, scene in enumerate(saved_scenes):
+    scene.export(f"{save_folder}/{id}.obj")
 
 ps.show()
